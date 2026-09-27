@@ -109,14 +109,20 @@ Expected: FAIL — `src/index.ts` does not exist yet.
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
+    "types": ["node"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }
 ```
+
+**Implementation note (found by actually running the build, not guessed):** two issues only surfaced when Task 9's `npm run build` was run for real:
+1. Without an explicit `"types": ["node"]`, `tsc` failed to resolve `node:*` built-in imports at all (`Cannot find name 'node:os'` — a name-lookup error, not a module-not-found error, meaning it wasn't even attempting module resolution for the specifier). Adding `"types": ["node"]` fixed it immediately.
+2. Without `"exclude": ["src/**/*.test.ts"]`, `tsc` compiled every `*.test.ts` file into `dist/` too — which would ship test files inside the published npm package (`"files": ["dist", "bin"]`), and made `vitest run` silently double-count every test (it discovered both `src/*.test.ts` and the freshly compiled `dist/*.test.js` as separate files: 82 "passing" tests instead of the real 41). Both are now fixed in the `tsconfig.json` above.
 
 `vitest.config.ts`:
 ```ts
@@ -1665,25 +1671,44 @@ git commit -m "feat: wire up the kswap CLI and add an end-to-end lifecycle test"
 
 Add to `src/installer.test.ts`:
 ```ts
-import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
-import { install, KSWAP_HOME } from './installer.js';
+import { install } from './installer.js';
+import type { Config } from './store.js';
 
 describe('install', () => {
-  it('copies the compiled shim runner into KSWAP_HOME/dist', () => {
+  it('copies the compiled shim runner into the injected kswapHome/dist, never the real ~/.kswap', () => {
+    // install() must never write to the real KSWAP_HOME during a test — this test injects
+    // its own throwaway home and its own loadConfig/saveConfig so a run on a developer's
+    // machine with a real kswap install cannot overwrite that install's shim files or config.
+    const testHome = mkdtempSync(join(tmpdir(), 'kswap-install-test-'));
     const fakeBuiltShimRunner = join(mkdtempSync(join(tmpdir(), 'kswap-build-')), 'shimRunner.js');
     writeFileSync(fakeBuiltShimRunner, '// built shim runner\n', 'utf8');
 
     const locateKiroCli = () => 'C:\\fake\\kiro-cli.exe';
     const pathDeps = { getUserPath: () => 'C:\\Windows', setUserPath: () => {} };
+    const captured: { config?: Config } = {};
 
-    install({ locateKiroCli, pathDeps, builtShimRunnerPath: fakeBuiltShimRunner } as any);
+    try {
+      install({
+        locateKiroCli,
+        pathDeps,
+        builtShimRunnerPath: fakeBuiltShimRunner,
+        loadConfig: () => ({ accounts: {}, active: null, kiroCliPath: null }),
+        saveConfig: (c) => {
+          captured.config = c;
+        },
+        kswapHome: testHome,
+      });
 
-    expect(existsSync(join(KSWAP_HOME, 'dist', 'shimRunner.js'))).toBe(true);
+      expect(existsSync(join(testHome, 'dist', 'shimRunner.js'))).toBe(true);
+      expect(captured.config?.kiroCliPath).toBe('C:\\fake\\kiro-cli.exe');
+    } finally {
+      rmSync(testHome, { recursive: true, force: true });
+    }
   });
 });
 ```
+
+**Implementation note (found by writing this test for real, not guessed):** the version originally sketched here called the real, unparameterized `install()`, which used the module-level `KSWAP_HOME` constant and the real `loadConfig`/`saveConfig` directly — meaning running this test suite on a machine with a real `kswap` install would have overwritten that install's actual shim files and config with test fixture content. The fix (reflected in the `install()`/`InstallDeps` code below) threads `kswapHome`, `loadConfig`, and `saveConfig` through as injectable dependencies, consistent with every other module in this plan, so tests never touch real user state.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -1692,11 +1717,14 @@ Expected: FAIL — `install()` does not yet accept/use `builtShimRunnerPath`, an
 
 - [ ] **Step 3: Update the installer**
 
-Modify `src/installer.ts` — extend `InstallDeps` and `install()`:
+Modify `src/installer.ts` — extend `InstallDeps` and `install()`. Note this also threads `kswapHome`,
+`loadConfig`, and `saveConfig` through as dependencies (not just `builtShimRunnerPath`), for the reason
+given in the implementation note above:
 ```ts
 import { mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { Config } from './store.js';
 // ...(other imports unchanged)...
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -1705,6 +1733,9 @@ export interface InstallDeps {
   locateKiroCli: () => string;
   pathDeps: PathDeps;
   builtShimRunnerPath: string;
+  loadConfig: () => Config;
+  saveConfig: (config: Config) => void;
+  kswapHome: string;
 }
 
 export function install(
@@ -1712,23 +1743,27 @@ export function install(
     locateKiroCli,
     pathDeps: realPathDeps,
     builtShimRunnerPath: join(__dirname, 'shimRunner.js'),
+    loadConfig,
+    saveConfig,
+    kswapHome: KSWAP_HOME,
   },
 ): void {
   const realKiroCliPath = deps.locateKiroCli();
-  const config = loadConfig();
+  const config = deps.loadConfig();
   config.kiroCliPath = realKiroCliPath;
-  saveConfig(config);
+  deps.saveConfig(config);
 
-  mkdirSync(SHIM_DIR, { recursive: true });
-  const shimRunnerDir = join(KSWAP_HOME, 'dist');
+  const shimDir = join(deps.kswapHome, 'bin');
+  mkdirSync(shimDir, { recursive: true });
+  const shimRunnerDir = join(deps.kswapHome, 'dist');
   mkdirSync(shimRunnerDir, { recursive: true });
   const shimRunnerJsPath = join(shimRunnerDir, 'shimRunner.js');
   copyFileSync(deps.builtShimRunnerPath, shimRunnerJsPath);
 
-  writeFileSync(join(SHIM_DIR, 'kiro-cli.cmd'), cmdShimContent(shimRunnerJsPath), 'utf8');
-  writeFileSync(join(SHIM_DIR, 'kiro-cli.ps1'), ps1ShimContent(shimRunnerJsPath), 'utf8');
+  writeFileSync(join(shimDir, 'kiro-cli.cmd'), cmdShimContent(shimRunnerJsPath), 'utf8');
+  writeFileSync(join(shimDir, 'kiro-cli.ps1'), ps1ShimContent(shimRunnerJsPath), 'utf8');
 
-  prependUserPath(SHIM_DIR, deps.pathDeps);
+  prependUserPath(shimDir, deps.pathDeps);
 }
 ```
 

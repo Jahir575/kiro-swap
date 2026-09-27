@@ -1,10 +1,13 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { locateKiroCli } from './kiroCli.js';
-import { loadConfig, saveConfig } from './store.js';
+import { loadConfig, saveConfig, type Config } from './store.js';
 import { cmdShimContent, ps1ShimContent } from './shim.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const KSWAP_HOME = join(homedir(), '.kswap');
 export const SHIM_DIR = join(KSWAP_HOME, 'bin');
@@ -41,18 +44,36 @@ export function prependUserPath(dir: string, deps: PathDeps = realPathDeps): voi
 export interface InstallDeps {
   locateKiroCli: () => string;
   pathDeps: PathDeps;
+  builtShimRunnerPath: string;
+  loadConfig: () => Config;
+  saveConfig: (config: Config) => void;
+  kswapHome: string;
 }
 
-export function install(deps: InstallDeps = { locateKiroCli, pathDeps: realPathDeps }): void {
+export function install(
+  deps: InstallDeps = {
+    locateKiroCli,
+    pathDeps: realPathDeps,
+    builtShimRunnerPath: join(__dirname, 'shimRunner.js'),
+    loadConfig,
+    saveConfig,
+    kswapHome: KSWAP_HOME,
+  },
+): void {
   const realKiroCliPath = deps.locateKiroCli();
-  const config = loadConfig();
+  const config = deps.loadConfig();
   config.kiroCliPath = realKiroCliPath;
-  saveConfig(config);
+  deps.saveConfig(config);
 
-  mkdirSync(SHIM_DIR, { recursive: true });
-  const shimRunnerJsPath = join(KSWAP_HOME, 'dist', 'shimRunner.js');
-  writeFileSync(join(SHIM_DIR, 'kiro-cli.cmd'), cmdShimContent(shimRunnerJsPath), 'utf8');
-  writeFileSync(join(SHIM_DIR, 'kiro-cli.ps1'), ps1ShimContent(shimRunnerJsPath), 'utf8');
+  const shimDir = join(deps.kswapHome, 'bin');
+  mkdirSync(shimDir, { recursive: true });
+  const shimRunnerDir = join(deps.kswapHome, 'dist');
+  mkdirSync(shimRunnerDir, { recursive: true });
+  const shimRunnerJsPath = join(shimRunnerDir, 'shimRunner.js');
+  copyFileSync(deps.builtShimRunnerPath, shimRunnerJsPath);
 
-  prependUserPath(SHIM_DIR, deps.pathDeps);
+  writeFileSync(join(shimDir, 'kiro-cli.cmd'), cmdShimContent(shimRunnerJsPath), 'utf8');
+  writeFileSync(join(shimDir, 'kiro-cli.ps1'), ps1ShimContent(shimRunnerJsPath), 'utf8');
+
+  prependUserPath(shimDir, deps.pathDeps);
 }
