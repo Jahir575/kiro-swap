@@ -6,12 +6,12 @@ gateway — without repeatedly handling teammates' raw credentials.
 ## Install
 
 ```
-npm install -g @mjahir/kswap
+npm install -g kiro-swap
 kswap install
 ```
 
-(Published as the scoped package `@mjahir/kswap` — npm's anti-typosquat
-policy rejected the unscoped name `kswap` as too similar to existing
+(Published on npm as `kiro-swap` — the unscoped name `kswap` was
+rejected by npm's anti-typosquat policy as too similar to existing
 packages like `asap`/`gsap`/`soap`. The CLI command itself is still
 `kswap`, unaffected by the package name.)
 
