@@ -47,6 +47,8 @@ Explicitly deferred (YAGNI — revisit only if v1 proves insufficient):
 - Parallel-session mode (running two accounts at once, like `cswap run`).
 - OS credential store (Windows Credential Manager) instead of a plain file.
 - Encryption of the stored keys.
+- **Kiro IDE as a third consumer** (investigated and deliberately dropped —
+  see "Kiro IDE — investigated, out of scope" below).
 
 ## Two independent consumers of `KIRO_API_KEY`
 
@@ -57,6 +59,38 @@ Explicitly deferred (YAGNI — revisit only if v1 proves insufficient):
 
 A `kswap switch` must update both, or the two surfaces silently disagree
 about which account is active.
+
+## Kiro IDE — investigated, out of scope
+
+Kiro IDE (a separate VS Code-fork application, distinct from Kiro Crew) was
+considered as a third consumer and investigated by signing in on this
+machine and diffing its config directory
+(`AppData\Roaming\Kiro\User\globalStorage`).
+
+Finding: Kiro IDE does **not** use a static `KIRO_API_KEY`. It authenticates
+via **AWS Identity Center SSO** (CodeWhisperer) — sign-in wrote an AWS
+CodeWhisperer profile ARN to
+`globalStorage\kiro.kiroagent\profile.json`, and no plaintext credential
+appeared anywhere else in the directory. The actual session token is
+presumed to live in VS Code's built-in encrypted secret storage
+(`globalStorage\state.vscdb`'s `ItemTable`, DPAPI-encrypted on Windows) —
+reading it to confirm was not attempted, since extracting a live
+credential's value is exactly the kind of action this environment
+correctly refuses to do outside the account owner's own control.
+
+This makes Kiro IDE structurally different from the other two consumers:
+switching it would mean swapping encrypted secret-storage state and/or
+`profile.json` in lockstep per account — closer to claude-swap's macOS
+Keychain problem than to rewriting a `.env` file — with real uncertainty
+about what exactly must move together, and real risk in getting it wrong
+(corrupting another VS Code extension's secret storage).
+
+**Decision: dropped from v1.** `kswap` targets `kiro-cli` + Crew only.
+Revisit only if the IDE turns out to be load-bearing for someone's daily
+workflow; if so, the next step would be a *separate*, narrowly-scoped
+investigation (with the account owner's own participation) into exactly
+which secret-storage keys move together per account, before any design
+work — not something to bolt onto this spec speculatively.
 
 ## Architecture
 
