@@ -20,6 +20,14 @@
     "prepublishOnly": "npm run build"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jahir575/kiro-swap.git"
+  },
+  "homepage": "https://github.com/Jahir575/kiro-swap#readme",
+  "bugs": {
+    "url": "https://github.com/Jahir575/kiro-swap/issues"
+  },
   "dependencies": {
     "chalk": "^6.0.1",
     "cli-table3": "^0.6.5",
