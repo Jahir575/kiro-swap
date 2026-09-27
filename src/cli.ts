@@ -7,6 +7,7 @@ import { currentAccount } from './commands/current.js';
 import { removeAccount } from './commands/remove.js';
 import { switchAccount } from './commands/switch.js';
 import { install } from './installer.js';
+import { VERSION } from './index.js';
 
 function printError(message: string): void {
   console.error(chalk.red(message));
@@ -16,7 +17,8 @@ export function buildCli(): Command {
   const program = new Command();
   program
     .name('kswap')
-    .description("Switch between multiple Kiro accounts without repeatedly handling teammates' raw credentials.");
+    .description("Switch between multiple Kiro accounts without repeatedly handling teammates' raw credentials.")
+    .version(VERSION);
 
   program
     .command('install')
