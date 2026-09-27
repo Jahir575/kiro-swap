@@ -316,12 +316,21 @@ function restrictToOwner(dir: string): void {
     return;
   }
   try {
-    execSync(`icacls "${dir}" /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F" /T`, { stdio: 'ignore' });
+    // Ask the OS who is actually running this process, rather than trusting the
+    // %USERNAME% environment variable — it can name a different principal than the
+    // real token (services, `runas`, sandboxed shells), and granting to the wrong
+    // name while stripping inheritance (`/inheritance:r`) would lock the real
+    // caller out of a file it just wrote. So: only ever add access for the actual
+    // identity, never remove anything already inherited.
+    const identity = execSync('whoami', { encoding: 'utf8' }).trim();
+    execSync(`icacls "${dir}" /grant:r "${identity}:(OI)(CI)F" /T`, { stdio: 'ignore' });
   } catch {
     // Best-effort ACL tightening; never block a save because it failed.
   }
 }
 ```
+
+**Implementation note (found by running the tests for real, not guessed):** the plan originally used `icacls ... /inheritance:r /grant:r "%USERNAME%:(OI)(CI)F"`. Testing on a real machine showed `%USERNAME%` can name a different principal than the process's actual token (confirmed here: a sandboxed shell reported `%USERNAME%=mjahi` while its real running identity was a different account entirely) — combined with `/inheritance:r` stripping the directory's existing inherited access, that silently locked the very process that just wrote the config out of reading it back, which `loadConfig`'s catch-all then masked as an empty config. The fix above asks the OS for the real identity via `whoami` and only ever adds access, never strips existing inherited grants — best-effort hardening that cannot regress below the directory's prior access.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
