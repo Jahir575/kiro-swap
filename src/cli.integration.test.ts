@@ -11,6 +11,7 @@ import { switchAccount, type SwitchDeps } from './commands/switch.js';
 import { loadConfig, saveConfig, type Config } from './store.js';
 import { whoami } from './kiroCli.js';
 import { writeEnvKey, readEnvKey } from './crew.js';
+import { getUsage } from './usage.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fakeKiroCliPath = join(__dirname, '..', 'test-fixtures', 'fake-kiro-cli.js');
@@ -68,8 +69,8 @@ describe('add -> switch -> list -> remove, end to end against a fake kiro-cli', 
     expect(envBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))).toBe(false);
     expect(envBytes.toString('utf8')).toBe('KIRO_API_KEY=key-for-teammate2\n');
 
-    const list = listAccounts({ loadConfig: () => loadConfig(home) });
-    expect(list).toEqual([{ name: 'teammate2', email: 'teammate2@company.com', active: true }]);
+    const list = await listAccounts({ loadConfig: () => loadConfig(home), getUsage });
+    expect(list).toEqual([{ name: 'teammate2', email: 'teammate2@company.com', active: true, usage: null }]);
 
     const removeResult = removeAccount('teammate2', {
       loadConfig: () => loadConfig(home),

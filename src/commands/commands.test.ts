@@ -62,19 +62,38 @@ describe('addAccount', () => {
 });
 
 describe('listAccounts', () => {
-  it('marks the active account and lists all others', () => {
+  it('marks the active account, lists all others, and attaches each one\'s usage', async () => {
     const config = configWith({
       accounts: {
         a: { key: 'ka', email: 'a@x.com', addedAt: 't' },
         b: { key: 'kb', email: 'b@x.com', addedAt: 't' },
       },
       active: 'b',
+      kiroCliPath: 'C:\\fake\\kiro-cli.exe',
     });
-    const result = listAccounts({ loadConfig: () => config });
+    const usageByKey: Record<string, { used: number; limit: number; percent: number; plan: string }> = {
+      ka: { used: 1, limit: 10000, percent: 0.01, plan: 'KIRO POWER' },
+      kb: { used: 2, limit: 10000, percent: 0.02, plan: 'KIRO POWER' },
+    };
+    const getUsage = vi.fn(async (_path: string, apiKey: string) => usageByKey[apiKey]);
+    const result = await listAccounts({ loadConfig: () => config, getUsage });
     expect(result).toEqual([
-      { name: 'a', email: 'a@x.com', active: false },
-      { name: 'b', email: 'b@x.com', active: true },
+      { name: 'a', email: 'a@x.com', active: false, usage: usageByKey.ka },
+      { name: 'b', email: 'b@x.com', active: true, usage: usageByKey.kb },
     ]);
+    expect(getUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips usage fetching entirely when kswap has never been installed', async () => {
+    const config = configWith({
+      accounts: { a: { key: 'ka', email: 'a@x.com', addedAt: 't' } },
+      active: null,
+      kiroCliPath: null,
+    });
+    const getUsage = vi.fn();
+    const result = await listAccounts({ loadConfig: () => config, getUsage });
+    expect(result).toEqual([{ name: 'a', email: 'a@x.com', active: false, usage: null }]);
+    expect(getUsage).not.toHaveBeenCalled();
   });
 });
 

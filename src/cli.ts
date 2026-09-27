@@ -8,9 +8,24 @@ import { removeAccount } from './commands/remove.js';
 import { switchAccount } from './commands/switch.js';
 import { install } from './installer.js';
 import { VERSION } from './index.js';
+import type { UsageInfo } from './usage.js';
 
 function printError(message: string): void {
   console.error(chalk.red(message));
+}
+
+function formatUsage(usage: UsageInfo | null): string {
+  if (!usage) {
+    return chalk.dim('—');
+  }
+  const text = `${usage.percent}% (${usage.used}/${usage.limit}) ${usage.plan}`;
+  if (usage.percent >= 90) {
+    return chalk.red(text);
+  }
+  if (usage.percent >= 70) {
+    return chalk.yellow(text);
+  }
+  return chalk.green(text);
 }
 
 export function buildCli(): Command {
@@ -44,16 +59,24 @@ export function buildCli(): Command {
 
   program
     .command('list')
-    .description('List all registered accounts')
-    .action(() => {
-      const accounts = listAccounts();
+    .description('List all registered accounts with their real credit usage')
+    .action(async () => {
+      console.error(chalk.dim('Checking credit usage…'));
+      const accounts = await listAccounts();
       if (accounts.length === 0) {
         console.log('No accounts registered. Use "kswap add <name> <key>".');
         return;
       }
-      const table = new Table({ head: [chalk.bold(''), chalk.bold('Name'), chalk.bold('Email')] });
+      const table = new Table({
+        head: [chalk.bold(''), chalk.bold('Name'), chalk.bold('Email'), chalk.bold('Credits')],
+      });
       for (const a of accounts) {
-        table.push([a.active ? chalk.green('●') : '', a.active ? chalk.bold(a.name) : a.name, a.email]);
+        table.push([
+          a.active ? chalk.green('●') : '',
+          a.active ? chalk.bold(a.name) : a.name,
+          a.email,
+          formatUsage(a.usage),
+        ]);
       }
       console.log(table.toString());
     });
