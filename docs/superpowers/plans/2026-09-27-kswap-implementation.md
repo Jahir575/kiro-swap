@@ -6,7 +6,7 @@
 
 **Architecture:** A Node/TypeScript CLI with a JSON store (`~/.kswap/config.json`), a thin `kiro-cli` PATH shim that re-reads the store on every invocation (so a switch takes effect in already-open terminals), and a Crew updater that rewrites `~/.kiro/crew/.env` and restarts the gateway's backend process, rolling back on failure.
 
-**Tech Stack:** TypeScript, Node.js ≥18, `commander` (CLI parsing), `chalk` (colored output), `cli-table3` (aligned tables), `vitest` (tests), compiled with `tsc` to `dist/`.
+**Tech Stack:** TypeScript (ESM/NodeNext), Node.js ≥18, `commander` (CLI parsing), `chalk` (colored output), `cli-table3` (aligned tables), `vitest` (tests), compiled with `tsc` to `dist/`.
 
 **Spec:** `docs/superpowers/specs/2026-09-27-kswap-design.md`
 
@@ -14,7 +14,8 @@
 
 - Package name and CLI command are both `kswap` (not `cswap`).
 - Node ≥18 (per `package.json` `engines`).
-- The project is CommonJS (`"module": "CommonJS"`, `bin/kswap.js` uses `require()`). Use `chalk@^4` specifically, not `^5` — chalk v5 is ESM-only and would break the build; v4 is the last fully CommonJS-compatible major and is what most CJS CLI tools still pin to.
+- The project is ESM (`"type": "module"` in `package.json`, `"module": "NodeNext"` in `tsconfig.json`) specifically so `chalk` can be taken at its true latest (v6, ESM-only). This means: every relative import in `.ts` source must include an explicit `.js` extension (TypeScript's NodeNext resolution requires this even though the source file is `.ts`); `__dirname`/`require.main`/`require()` don't exist and are replaced by `import.meta.url`-based equivalents everywhere they'd otherwise be used; `bin/kswap.js` uses `import` instead of `require()`.
+- All dependencies are pinned to their actual latest release as of 2026-09-27: `commander@^15.0.0`, `chalk@^6.0.1`, `cli-table3@^0.6.5`, `typescript@^7.0.2`, `vitest@^5.0.2`, `@types/node@^26.6.3`. Re-check versions before publishing if implementation happens much later than the plan was written.
 - Windows-only for v1 — the design's shim, PATH, and ACL mechanisms are all Windows-specific (`.cmd`/`.ps1`, `icacls`, `taskkill`); no cross-platform code paths are in scope.
 - Account keys are stored in plaintext at `~/.kswap/config.json` (per spec — no encryption, no OS credential store in v1).
 - `.env` writes must be UTF-8 **without a BOM** — Node's default `'utf8'` file writes already omit the BOM; the risk is only on read (an existing file may carry one from a prior PowerShell write) and must be stripped before rewriting.
@@ -50,7 +51,7 @@
 `src/index.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
-import { VERSION } from './index';
+import { VERSION } from './index.js';
 
 describe('index', () => {
   it('exports a semver-looking version string', () => {
@@ -71,6 +72,7 @@ Expected: FAIL — `src/index.ts` does not exist yet.
 {
   "name": "kswap",
   "version": "0.1.0",
+  "type": "module",
   "description": "Switch between multiple Kiro accounts (kiro-cli + Kiro Crew) without repeatedly handling teammates' raw credentials.",
   "bin": {
     "kswap": "bin/kswap.js"
@@ -85,14 +87,14 @@ Expected: FAIL — `src/index.ts` does not exist yet.
   },
   "license": "MIT",
   "dependencies": {
-    "commander": "^12.0.0",
-    "chalk": "^4.1.2",
+    "commander": "^15.0.0",
+    "chalk": "^6.0.1",
     "cli-table3": "^0.6.5"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "vitest": "^1.4.0",
-    "@types/node": "^20.11.0"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
+    "@types/node": "^26.6.3"
   }
 }
 ```
@@ -102,8 +104,8 @@ Expected: FAIL — `src/index.ts` does not exist yet.
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
@@ -130,8 +132,10 @@ export default defineConfig({
 `src/index.ts`:
 ```ts
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8'));
 
 export const VERSION: string = pkg.version;
@@ -182,10 +186,10 @@ git commit -m "chore: project scaffolding (TypeScript, vitest, commander)"
 `src/store.test.ts`:
 ```ts
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { defaultConfig, loadConfig, saveConfig, configDir } from './store';
+import { defaultConfig, loadConfig, saveConfig, configDir } from './store.js';
 
 const tempDirs: string[] = [];
 function makeHome(): string {
@@ -208,7 +212,6 @@ describe('loadConfig', () => {
 
   it('returns a default config (not throw) when the file is corrupt JSON', () => {
     const home = makeHome();
-    const { mkdirSync, writeFileSync } = require('node:fs');
     mkdirSync(configDir(home), { recursive: true });
     writeFileSync(join(configDir(home), 'config.json'), '{ not json', 'utf8');
     expect(loadConfig(home)).toEqual(defaultConfig());
@@ -352,7 +355,7 @@ git commit -m "feat: add config store with atomic writes and corrupt-file recove
 `src/kiroCli.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
-import { locateKiroCli, whoami } from './kiroCli';
+import { locateKiroCli, whoami } from './kiroCli.js';
 
 describe('locateKiroCli', () => {
   it('returns the first non-empty line from the exec function', () => {
@@ -488,7 +491,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readEnvKey, writeEnvKey, readSessionPids, restartGateway } from './crew';
+import { readEnvKey, writeEnvKey, readSessionPids, restartGateway } from './crew.js';
 
 const tempDirs: string[] = [];
 function makeDir(): string {
@@ -721,8 +724,8 @@ git commit -m "feat: add Crew .env updater and PID-based gateway restart"
 `src/shimRunner.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
-import { resolveEnv } from './shimRunner';
-import type { Config } from './store';
+import { resolveEnv } from './shimRunner.js';
+import type { Config } from './store.js';
 
 describe('resolveEnv', () => {
   it('injects KIRO_API_KEY for the active account', () => {
@@ -758,7 +761,7 @@ describe('resolveEnv', () => {
 `src/shim.test.ts`:
 ```ts
 import { describe, it, expect } from 'vitest';
-import { cmdShimContent, ps1ShimContent } from './shim';
+import { cmdShimContent, ps1ShimContent } from './shim.js';
 
 describe('cmdShimContent', () => {
   it('invokes node on the shim runner and forwards all arguments', () => {
@@ -779,7 +782,7 @@ describe('ps1ShimContent', () => {
 `src/installer.test.ts`:
 ```ts
 import { describe, it, expect, vi } from 'vitest';
-import { prependUserPath } from './installer';
+import { prependUserPath } from './installer.js';
 
 describe('prependUserPath', () => {
   it('does nothing when the directory is already on PATH (case-insensitive)', () => {
@@ -813,7 +816,8 @@ Expected: FAIL — none of the three modules exist yet.
 `src/shimRunner.ts`:
 ```ts
 import { spawnSync } from 'node:child_process';
-import { loadConfig, type Config } from './store';
+import { fileURLToPath } from 'node:url';
+import { loadConfig, type Config } from './store.js';
 
 export function resolveEnv(config: Config | null, baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   if (!config || !config.active) {
@@ -845,7 +849,7 @@ export function main(argv: string[]): never {
   process.exit(result.status ?? 1);
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main(process.argv);
 }
 ```
@@ -867,9 +871,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { locateKiroCli } from './kiroCli';
-import { loadConfig, saveConfig } from './store';
-import { cmdShimContent, ps1ShimContent } from './shim';
+import { locateKiroCli } from './kiroCli.js';
+import { loadConfig, saveConfig } from './store.js';
+import { cmdShimContent, ps1ShimContent } from './shim.js';
 
 export const KSWAP_HOME = join(homedir(), '.kswap');
 export const SHIM_DIR = join(KSWAP_HOME, 'bin');
@@ -964,11 +968,11 @@ git commit -m "feat: add kiro-cli shim runner, shim templates, and PATH installe
 `src/commands/commands.test.ts`:
 ```ts
 import { describe, it, expect, vi } from 'vitest';
-import { addAccount } from './add';
-import { listAccounts } from './list';
-import { currentAccount } from './current';
-import { removeAccount } from './remove';
-import type { Config } from '../store';
+import { addAccount } from './add.js';
+import { listAccounts } from './list.js';
+import { currentAccount } from './current.js';
+import { removeAccount } from './remove.js';
+import type { Config } from '../store.js';
 
 function configWith(overrides: Partial<Config> = {}): Config {
   return { accounts: {}, active: null, kiroCliPath: 'C:\\fake\\kiro-cli.exe', ...overrides };
@@ -1099,8 +1103,8 @@ Expected: FAIL — none of `add`/`list`/`current`/`remove` exist yet.
 
 `src/commands/add.ts`:
 ```ts
-import { loadConfig, saveConfig, type Config } from '../store';
-import { whoami } from '../kiroCli';
+import { loadConfig, saveConfig, type Config } from '../store.js';
+import { whoami } from '../kiroCli.js';
 
 export type AddResult = { ok: true; email: string } | { ok: false; error: string };
 
@@ -1137,7 +1141,7 @@ export function addAccount(
 
 `src/commands/list.ts`:
 ```ts
-import { loadConfig, type Config } from '../store';
+import { loadConfig, type Config } from '../store.js';
 
 export interface ListDeps {
   loadConfig: () => Config;
@@ -1153,7 +1157,7 @@ export function listAccounts(deps: ListDeps = { loadConfig }): { name: string; e
 
 `src/commands/current.ts`:
 ```ts
-import { loadConfig, type Config } from '../store';
+import { loadConfig, type Config } from '../store.js';
 
 export interface CurrentDeps {
   loadConfig: () => Config;
@@ -1171,7 +1175,7 @@ export function currentAccount(deps: CurrentDeps = { loadConfig }): { name: stri
 
 `src/commands/remove.ts`:
 ```ts
-import { loadConfig, saveConfig, type Config } from '../store';
+import { loadConfig, saveConfig, type Config } from '../store.js';
 
 export type RemoveResult = { ok: true } | { ok: false; error: string };
 
@@ -1228,8 +1232,8 @@ git commit -m "feat: add add/list/current/remove account commands"
 `src/commands/switch.test.ts`:
 ```ts
 import { describe, it, expect, vi } from 'vitest';
-import { switchAccount, type SwitchDeps } from './switch';
-import type { Config } from '../store';
+import { switchAccount, type SwitchDeps } from './switch.js';
+import type { Config } from '../store.js';
 
 function baseDeps(config: Config, overrides: Partial<SwitchDeps> = {}): SwitchDeps {
   return {
@@ -1304,9 +1308,10 @@ Expected: FAIL — `./switch` does not exist.
 `src/commands/switch.ts`:
 ```ts
 import { join } from 'node:path';
-import { loadConfig, saveConfig, type Config } from '../store';
-import { readEnvKey, writeEnvKey, restartGateway } from '../crew';
-import { whoami } from '../kiroCli';
+import { homedir } from 'node:os';
+import { loadConfig, saveConfig, type Config } from '../store.js';
+import { readEnvKey, writeEnvKey, restartGateway } from '../crew.js';
+import { whoami } from '../kiroCli.js';
 
 export type SwitchResult = { ok: true; email: string } | { ok: false; error: string };
 
@@ -1322,7 +1327,7 @@ export interface SwitchDeps {
 }
 
 function defaultCrewDir(): string {
-  return join(require('node:os').homedir(), '.kiro', 'crew');
+  return join(homedir(), '.kiro', 'crew');
 }
 
 const realDeps: SwitchDeps = {
@@ -1422,16 +1427,19 @@ process.exit(1);
 ```ts
 import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
-import { addAccount } from './commands/add';
-import { listAccounts } from './commands/list';
-import { removeAccount } from './commands/remove';
-import { switchAccount, type SwitchDeps } from './commands/switch';
-import { loadConfig, saveConfig, type Config } from './store';
-import { whoami } from './kiroCli';
-import { writeEnvKey, readEnvKey } from './crew';
+import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { addAccount } from './commands/add.js';
+import { listAccounts } from './commands/list.js';
+import { removeAccount } from './commands/remove.js';
+import { switchAccount, type SwitchDeps } from './commands/switch.js';
+import { loadConfig, saveConfig, type Config } from './store.js';
+import { whoami } from './kiroCli.js';
+import { writeEnvKey, readEnvKey } from './crew.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const fakeKiroCliPath = join(__dirname, '..', 'test-fixtures', 'fake-kiro-cli.js');
 let home: string;
 let envPath: string;
@@ -1454,7 +1462,7 @@ function whoamiViaFixture(_path: string, key: string) {
   // spawnSync a real node process running the fixture, so this exercises the same
   // code path (whoami()) with a real child process rather than a stub.
   return whoami(process.execPath, key, (execPath, _args, options) =>
-    require('node:child_process').spawnSync(execPath, [fakeKiroCliPath, 'whoami'], options),
+    spawnSync(execPath, [fakeKiroCliPath, 'whoami'], options),
   );
 }
 
@@ -1511,12 +1519,12 @@ Expected: FAIL initially on the `writeFileSync`/`saveConfig` calls only if `src/
 import { Command } from 'commander';
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { addAccount } from './commands/add';
-import { listAccounts } from './commands/list';
-import { currentAccount } from './commands/current';
-import { removeAccount } from './commands/remove';
-import { switchAccount } from './commands/switch';
-import { install } from './installer';
+import { addAccount } from './commands/add.js';
+import { listAccounts } from './commands/list.js';
+import { currentAccount } from './commands/current.js';
+import { removeAccount } from './commands/remove.js';
+import { switchAccount } from './commands/switch.js';
+import { install } from './installer.js';
 
 function printError(message: string): void {
   console.error(chalk.red(message));
@@ -1615,7 +1623,8 @@ export function run(argv: string[]): void {
 `bin/kswap.js`:
 ```js
 #!/usr/bin/env node
-require('../dist/cli').run(process.argv);
+import { run } from '../dist/cli.js';
+run(process.argv);
 ```
 
 - [ ] **Step 4: Run the full test suite to verify everything still passes**
@@ -1650,7 +1659,7 @@ Add to `src/installer.test.ts`:
 import { mkdtempSync, rmSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { install } from './installer';
+import { install, KSWAP_HOME } from './installer.js';
 
 describe('install', () => {
   it('copies the compiled shim runner into KSWAP_HOME/dist', () => {
@@ -1662,7 +1671,6 @@ describe('install', () => {
 
     install({ locateKiroCli, pathDeps, builtShimRunnerPath: fakeBuiltShimRunner } as any);
 
-    const { KSWAP_HOME } = require('./installer');
     expect(existsSync(join(KSWAP_HOME, 'dist', 'shimRunner.js'))).toBe(true);
   });
 });
@@ -1678,7 +1686,11 @@ Expected: FAIL — `install()` does not yet accept/use `builtShimRunnerPath`, an
 Modify `src/installer.ts` — extend `InstallDeps` and `install()`:
 ```ts
 import { mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 // ...(other imports unchanged)...
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface InstallDeps {
   locateKiroCli: () => string;
