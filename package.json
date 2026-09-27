@@ -1,0 +1,28 @@
+{
+  "name": "kswap",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Switch between multiple Kiro accounts (kiro-cli + Kiro Crew) without repeatedly handling teammates' raw credentials.",
+  "bin": {
+    "kswap": "bin/kswap.js"
+  },
+  "main": "dist/index.js",
+  "files": ["dist", "bin"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^15.0.0",
+    "chalk": "^6.0.1",
+    "cli-table3": "^0.6.5"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2",
+    "@types/node": "^26.6.3"
+  }
+}
