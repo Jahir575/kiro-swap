@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="342.8" height="140" viewBox="0 0 342.8 140">
+  <rect width="342.8" height="140" rx="10" fill="#0d1117" />
+  <rect width="342.8" height="28" rx="10" fill="#161b22" />
+  <rect y="18" width="342.8" height="10" fill="#161b22" />
+  <circle cx="18" cy="14" r="5" fill="#ff5f56" />
+  <circle cx="36" cy="14" r="5" fill="#ffbd2e" />
+  <circle cx="54" cy="14" r="5" fill="#27c93f" />
+  <text x="171.4" y="18" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#8b949e" text-anchor="middle">kswap</text>
+  <g>
+    <text y="44" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">$</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> </tspan><tspan x="32.8" fill="#e6e6e6" font-weight="400" opacity="1">kswap add alice demo-key-alice-9f2a</tspan></text>
+    <text y="64" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">✓</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> Added </tspan><tspan x="83.2" fill="#e6e6e6" font-weight="600" opacity="1">alice</tspan><tspan x="125.2" fill="#e6e6e6" font-weight="400" opacity="1"> (alice@acme.dev).</tspan></text>
+    <text y="84" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">$</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> </tspan><tspan x="32.8" fill="#e6e6e6" font-weight="400" opacity="1">kswap add bob demo-key-bob-77c1</tspan></text>
+    <text y="104" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">✓</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> Added </tspan><tspan x="83.2" fill="#e6e6e6" font-weight="600" opacity="1">bob</tspan><tspan x="108.4" fill="#e6e6e6" font-weight="400" opacity="1"> (bob@acme.dev).</tspan></text>
+  </g>
+</svg>

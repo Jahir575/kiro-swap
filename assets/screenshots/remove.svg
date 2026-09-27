@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100">
+  <rect width="200" height="100" rx="10" fill="#0d1117" />
+  <rect width="200" height="28" rx="10" fill="#161b22" />
+  <rect y="18" width="200" height="10" fill="#161b22" />
+  <circle cx="18" cy="14" r="5" fill="#ff5f56" />
+  <circle cx="36" cy="14" r="5" fill="#ffbd2e" />
+  <circle cx="54" cy="14" r="5" fill="#27c93f" />
+  <text x="100.0" y="18" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#8b949e" text-anchor="middle">kswap</text>
+  <g>
+    <text y="44" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">$</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> </tspan><tspan x="32.8" fill="#e6e6e6" font-weight="400" opacity="1">kswap remove alice</tspan></text>
+    <text y="64" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">✓</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> Removed </tspan><tspan x="100.0" fill="#e6e6e6" font-weight="600" opacity="1">alice</tspan><tspan x="142.0" fill="#e6e6e6" font-weight="400" opacity="1">.</tspan></text>
+  </g>
+</svg>

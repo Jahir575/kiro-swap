@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="636.8" height="120" viewBox="0 0 636.8 120">
+  <rect width="636.8" height="120" rx="10" fill="#0d1117" />
+  <rect width="636.8" height="28" rx="10" fill="#161b22" />
+  <rect y="18" width="636.8" height="10" fill="#161b22" />
+  <circle cx="18" cy="14" r="5" fill="#ff5f56" />
+  <circle cx="36" cy="14" r="5" fill="#ffbd2e" />
+  <circle cx="54" cy="14" r="5" fill="#27c93f" />
+  <text x="318.4" y="18" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="12" fill="#8b949e" text-anchor="middle">kswap</text>
+  <g>
+    <text y="44" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">$</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> </tspan><tspan x="32.8" fill="#e6e6e6" font-weight="400" opacity="1">kswap switch bob</tspan></text>
+    <text y="64" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#59d185" font-weight="400" opacity="1">✓</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> Switched to </tspan><tspan x="133.6" fill="#e6e6e6" font-weight="600" opacity="1">bob</tspan><tspan x="158.8" fill="#e6e6e6" font-weight="400" opacity="1"> (bob@acme.dev).</tspan></text>
+    <text y="84" font-family="SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" font-size="14" xml:space="preserve"><tspan x="16.0" fill="#f6c453" font-weight="400" opacity="1">!</tspan><tspan x="24.4" fill="#e6e6e6" font-weight="400" opacity="1"> Restart Kiro Crew manually for the gateway to pick up the new account.</tspan></text>
+  </g>
+</svg>
