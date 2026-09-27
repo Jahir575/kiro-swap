@@ -54,13 +54,15 @@ describe('add -> switch -> list -> remove, end to end against a fake kiro-cli', 
       saveConfig: (c) => saveConfig(c, home),
       readEnvKey: (p) => readEnvKey(p),
       writeEnvKey: (p, k) => writeEnvKey(p, k),
-      restartGateway: async () => true, // Crew restart is stubbed per the spec's Testing section.
       whoami: whoamiViaFixture,
       envPath,
-      crewDir: join(home, 'crew'),
     };
-    const switchResult = await switchAccount('teammate2', switchDeps);
-    expect(switchResult).toEqual({ ok: true, email: 'teammate2@company.com' });
+    const switchResult = switchAccount('teammate2', switchDeps);
+    expect(switchResult).toEqual({
+      ok: true,
+      email: 'teammate2@company.com',
+      note: 'Restart Kiro Crew manually for the gateway to pick up the new account.',
+    });
 
     const envBytes = readFileSync(envPath);
     expect(envBytes.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))).toBe(false);

@@ -137,11 +137,33 @@ A single Node/TypeScript CLI (`kswap`), with:
    `~/.kiro/crew/.env` (UTF-8 **without** BOM — Windows PowerShell's
    default UTF-8 write adds a BOM that silently breaks the gateway's
    `k.strip() == key` loader check; this was already hit and fixed once
-   in this environment) and restarts the gateway. The exact restart
-   mechanism (a `kiro-cli crew` subcommand flag, vs. signaling the process
-   behind `~/.kiro/crew/gateway.lock`) is unconfirmed and must be
-   determined during implementation — this is a research task for the
-   plan, not a design blocker.
+   in this environment). It does **not** attempt to restart the gateway
+   itself — see "Amendment: Crew restart is manual" below.
+
+## Amendment: Crew restart is manual, not automatic
+
+The implementation plan's original mechanism for restarting the Crew
+gateway — killing the backend PID recorded in
+`~/.kiro/crew/kiro_session_pids.txt` and waiting for a new one to
+appear — was built, tested (unit tests passed), and then tried against
+a real, running Kiro Crew install. It failed there: the PID recorded in
+that file did not match the actual running backend process (a live,
+high-memory `python.exe`), so no restart was ever detected, and
+`switch` correctly rolled back rather than falsely reporting success.
+
+Rather than keep chasing a reliable restart signal (which would mean
+more experimentation against a real, running gateway process — not
+something to do casually), `switch` no longer restarts Crew at all.
+It writes `.env`, verifies the new key via `kiro-cli whoami` (this part
+never depended on Crew and still works), and on success returns a note
+telling the person to restart Kiro Crew manually. Terminal `kiro-cli`
+usage is unaffected by this change — it already updates instantly via
+the shim, with no restart of anything required.
+
+`crew.ts`'s PID-tracking/restart code (`restartGateway`, `readSessionPids`,
+`PidInfo`, `RestartDeps`) was deleted along with its tests, per YAGNI —
+nothing calls it anymore. If a reliable restart signal is ever found,
+that's new design work, not a resurrection of this code.
 
 ## Commands
 
@@ -152,8 +174,9 @@ A single Node/TypeScript CLI (`kswap`), with:
 - `kswap list` — shows every stored account's name + cached identity,
   marking the currently active one.
 - `kswap switch <name>` — sets `active` in the store, rewrites Crew's
-  `.env`, restarts the Crew gateway, then re-runs `kiro-cli whoami` to
-  confirm the switch actually took effect before reporting success.
+  `.env`, then re-runs `kiro-cli whoami` to confirm the switch actually
+  took effect before reporting success. Kiro Crew itself needs a manual
+  restart to pick up the change; `kiro-cli` in a terminal does not.
 - `kswap remove <name>` — deletes the account from the store; refuses if
   it is currently active (must switch away first).
 - `kswap current` — prints the active account's name/identity.
@@ -162,10 +185,10 @@ A single Node/TypeScript CLI (`kswap`), with:
 
 - `add` surfaces the `whoami` failure verbatim on an invalid key; nothing
   is stored.
-- `switch` rewrites `.env` and restarts Crew; if the restart fails or the
-  post-switch `whoami` check doesn't match the intended account, the
-  `.env` change is rolled back to its prior contents rather than left
-  half-applied, and the command exits non-zero with the failure reason.
+- `switch` rewrites `.env`; if the post-switch `whoami` check doesn't
+  match the intended account, the `.env` change is rolled back to its
+  prior contents rather than left half-applied, and the command exits
+  non-zero with the failure reason.
 - The shim never throws where a passthrough would do instead: missing
   config, corrupt config, or a key that no longer authenticates all fall
   through to running the real `kiro-cli.exe` with the ambient environment
@@ -179,14 +202,15 @@ A single Node/TypeScript CLI (`kswap`), with:
   run against a fake `kiro-cli` stub rather than the real binary.
 - Integration test exercising `add` → `switch` → `list` → `remove`
   end-to-end against the stub, including the `.env` rewrite (verifying
-  no BOM is introduced) and a stubbed Crew-restart step.
+  no BOM is introduced).
 - No test coverage is planned for actually calling real Kiro accounts —
   that would require live teammate credentials, which is out of scope
   for automated tests.
 
 ## Open questions for the implementation plan
 
-1. Exact Kiro Crew gateway restart mechanism.
+1. ~~Exact Kiro Crew gateway restart mechanism.~~ Resolved by not
+   attempting one — see "Amendment: Crew restart is manual" above.
 2. Whether `kiro-cli` accepts `KIRO_API_KEY` unconditionally for any Kiro
    account tier used at the company, or only for accounts provisioned a
    certain way (this environment's own account already confirmed to work

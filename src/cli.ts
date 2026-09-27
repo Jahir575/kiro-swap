@@ -70,15 +70,16 @@ export function buildCli(): Command {
 
   program
     .command('switch <name>')
-    .description('Switch kiro-cli and Kiro Crew to the given account')
-    .action(async (name: string) => {
-      const result = await switchAccount(name);
+    .description('Switch kiro-cli to the given account (Kiro Crew needs a manual restart)')
+    .action((name: string) => {
+      const result = switchAccount(name);
       if (!result.ok) {
         printError(result.error);
         process.exitCode = 1;
         return;
       }
       console.log(chalk.green('✓'), `Switched to ${chalk.bold(name)} (${result.email}).`);
+      console.log(chalk.yellow('!'), result.note);
     });
 
   program

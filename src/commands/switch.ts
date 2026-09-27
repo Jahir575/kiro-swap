@@ -1,20 +1,18 @@
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadConfig, saveConfig, type Config } from '../store.js';
-import { readEnvKey, writeEnvKey, restartGateway } from '../crew.js';
+import { readEnvKey, writeEnvKey } from '../crew.js';
 import { whoami } from '../kiroCli.js';
 
-export type SwitchResult = { ok: true; email: string } | { ok: false; error: string };
+export type SwitchResult = { ok: true; email: string; note: string } | { ok: false; error: string };
 
 export interface SwitchDeps {
   loadConfig(): Config;
   saveConfig(config: Config): void;
   readEnvKey(path: string): string | null;
   writeEnvKey(path: string, key: string): void;
-  restartGateway(crewDir: string): Promise<boolean>;
   whoami(path: string, key: string): { ok: boolean; email: string | null; rawOutput: string };
   envPath: string;
-  crewDir: string;
 }
 
 function defaultCrewDir(): string {
@@ -26,13 +24,13 @@ const realDeps: SwitchDeps = {
   saveConfig,
   readEnvKey,
   writeEnvKey,
-  restartGateway: (crewDir: string) => restartGateway(crewDir),
   whoami,
   envPath: join(defaultCrewDir(), '.env'),
-  crewDir: defaultCrewDir(),
 };
 
-export async function switchAccount(name: string, deps: SwitchDeps = realDeps): Promise<SwitchResult> {
+const MANUAL_RESTART_NOTE = 'Restart Kiro Crew manually for the gateway to pick up the new account.';
+
+export function switchAccount(name: string, deps: SwitchDeps = realDeps): SwitchResult {
   const config = deps.loadConfig();
   const account = config.accounts[name];
   if (!account) {
@@ -45,14 +43,6 @@ export async function switchAccount(name: string, deps: SwitchDeps = realDeps): 
   const previousKey = deps.readEnvKey(deps.envPath);
   deps.writeEnvKey(deps.envPath, account.key);
 
-  const restarted = await deps.restartGateway(deps.crewDir);
-  if (!restarted) {
-    if (previousKey !== null) {
-      deps.writeEnvKey(deps.envPath, previousKey);
-    }
-    return { ok: false, error: 'Kiro Crew gateway did not restart in time. Rolled back.' };
-  }
-
   const check = deps.whoami(config.kiroCliPath, account.key);
   if (!check.ok || check.email !== account.email) {
     if (previousKey !== null) {
@@ -63,5 +53,5 @@ export async function switchAccount(name: string, deps: SwitchDeps = realDeps): 
 
   config.active = name;
   deps.saveConfig(config);
-  return { ok: true, email: account.email };
+  return { ok: true, email: account.email, note: MANUAL_RESTART_NOTE };
 }

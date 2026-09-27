@@ -1,6 +1,4 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
-import { join } from 'node:path';
 
 export function readEnvKey(envPath: string): string | null {
   if (!existsSync(envPath)) {
@@ -31,69 +29,4 @@ export function writeEnvKey(envPath: string, key: string): void {
 
 function stripBom(content: string): string {
   return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-}
-
-export interface PidInfo {
-  backendPid: number;
-  parentPid: number;
-  token: string;
-}
-
-export function readSessionPids(pidsPath: string): PidInfo | null {
-  if (!existsSync(pidsPath)) {
-    return null;
-  }
-  const content = readFileSync(pidsPath, 'utf8').trim();
-  const parts = content.split(':');
-  if (parts.length !== 3) {
-    return null;
-  }
-  const backendPid = Number.parseInt(parts[0], 10);
-  const parentPid = Number.parseInt(parts[1], 10);
-  if (Number.isNaN(backendPid) || Number.isNaN(parentPid)) {
-    return null;
-  }
-  return { backendPid, parentPid, token: parts[2] };
-}
-
-export interface RestartDeps {
-  readSessionPids: (path: string) => PidInfo | null;
-  killProcess: (pid: number) => void;
-  sleep: (ms: number) => Promise<void>;
-}
-
-const realDeps: RestartDeps = {
-  readSessionPids,
-  killProcess: (pid) => {
-    try {
-      execSync(`taskkill /PID ${pid} /F`, { stdio: 'ignore' });
-    } catch {
-      // Already dead is fine — we only care that a *new* pid shows up next.
-    }
-  },
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-};
-
-export async function restartGateway(
-  crewDir: string,
-  deps: RestartDeps = realDeps,
-  timeoutMs = 15000,
-  pollIntervalMs = 500,
-): Promise<boolean> {
-  const pidsPath = join(crewDir, 'kiro_session_pids.txt');
-  const before = deps.readSessionPids(pidsPath);
-  if (!before) {
-    return false;
-  }
-  deps.killProcess(before.backendPid);
-  let elapsed = 0;
-  while (elapsed < timeoutMs) {
-    await deps.sleep(pollIntervalMs);
-    elapsed += pollIntervalMs;
-    const after = deps.readSessionPids(pidsPath);
-    if (after && after.backendPid !== before.backendPid) {
-      return true;
-    }
-  }
-  return false;
 }

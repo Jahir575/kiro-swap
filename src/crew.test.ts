@@ -1,8 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readEnvKey, writeEnvKey, readSessionPids, restartGateway } from './crew.js';
+import { readEnvKey, writeEnvKey } from './crew.js';
 
 const tempDirs: string[] = [];
 function makeDir(): string {
@@ -42,45 +42,5 @@ describe('readEnvKey / writeEnvKey', () => {
     const envPath = join(makeDir(), '.env');
     writeFileSync(envPath, 'FOO=bar\n', 'utf8');
     expect(readEnvKey(envPath)).toBeNull();
-  });
-});
-
-describe('readSessionPids', () => {
-  it('parses backendPid:parentPid:token', () => {
-    const pidsPath = join(makeDir(), 'kiro_session_pids.txt');
-    writeFileSync(pidsPath, '3556:4940:134349929334747023', 'utf8');
-    expect(readSessionPids(pidsPath)).toEqual({ backendPid: 3556, parentPid: 4940, token: '134349929334747023' });
-  });
-
-  it('returns null when the file does not exist', () => {
-    expect(readSessionPids(join(makeDir(), 'missing.txt'))).toBeNull();
-  });
-});
-
-describe('restartGateway', () => {
-  it('kills the current backend pid and resolves true once a new pid appears', async () => {
-    let call = 0;
-    const readSessionPids = vi.fn(() => {
-      call += 1;
-      return call === 1
-        ? { backendPid: 111, parentPid: 1, token: 't' }
-        : { backendPid: 222, parentPid: 1, token: 't' };
-    });
-    const killProcess = vi.fn();
-    const sleep = vi.fn(async () => {});
-    const ok = await restartGateway('C:\\fake\\crew', { readSessionPids, killProcess, sleep }, 5000, 100);
-    expect(ok).toBe(true);
-    expect(killProcess).toHaveBeenCalledWith(111);
-  });
-
-  it('resolves false when the backend pid never changes before the timeout', async () => {
-    const readSessionPids = vi.fn(() => ({ backendPid: 111, parentPid: 1, token: 't' }));
-    const killProcess = vi.fn();
-    let elapsed = 0;
-    const sleep = vi.fn(async (ms: number) => {
-      elapsed += ms;
-    });
-    const ok = await restartGateway('C:\\fake\\crew', { readSessionPids, killProcess, sleep }, 1000, 100);
-    expect(ok).toBe(false);
   });
 });

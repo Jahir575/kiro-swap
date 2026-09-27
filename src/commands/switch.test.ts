@@ -8,10 +8,8 @@ function baseDeps(config: Config, overrides: Partial<SwitchDeps> = {}): SwitchDe
     saveConfig: vi.fn(),
     readEnvKey: vi.fn(() => 'previous-key'),
     writeEnvKey: vi.fn(),
-    restartGateway: vi.fn(async () => true),
     whoami: vi.fn(() => ({ ok: true, email: 'teammate2@company.com', rawOutput: '' })),
     envPath: 'C:\\fake\\.env',
-    crewDir: 'C:\\fake\\crew',
     ...overrides,
   };
 }
@@ -26,39 +24,33 @@ function configWith(overrides: Partial<Config> = {}): Config {
 }
 
 describe('switchAccount', () => {
-  it('happy path: writes the new key, restarts, verifies, and updates active', async () => {
+  it('happy path: writes the new key, verifies via whoami, updates active, and notes the manual Crew restart', () => {
     const config = configWith();
     const deps = baseDeps(config);
-    const result = await switchAccount('teammate2', deps);
-    expect(result).toEqual({ ok: true, email: 'teammate2@company.com' });
+    const result = switchAccount('teammate2', deps);
+    expect(result).toEqual({
+      ok: true,
+      email: 'teammate2@company.com',
+      note: 'Restart Kiro Crew manually for the gateway to pick up the new account.',
+    });
     expect(deps.writeEnvKey).toHaveBeenCalledWith('C:\\fake\\.env', 'new-key');
     expect(deps.saveConfig).toHaveBeenCalledWith(expect.objectContaining({ active: 'teammate2' }));
   });
 
-  it('returns an error for an unknown account without touching env/crew', async () => {
+  it('returns an error for an unknown account without touching env', () => {
     const config = configWith();
     const deps = baseDeps(config);
-    const result = await switchAccount('ghost', deps);
+    const result = switchAccount('ghost', deps);
     expect(result.ok).toBe(false);
     expect(deps.writeEnvKey).not.toHaveBeenCalled();
-    expect(deps.restartGateway).not.toHaveBeenCalled();
   });
 
-  it('rolls back the env key when the gateway restart fails', async () => {
-    const config = configWith();
-    const deps = baseDeps(config, { restartGateway: vi.fn(async () => false) });
-    const result = await switchAccount('teammate2', deps);
-    expect(result.ok).toBe(false);
-    expect(deps.writeEnvKey).toHaveBeenNthCalledWith(1, 'C:\\fake\\.env', 'new-key');
-    expect(deps.writeEnvKey).toHaveBeenNthCalledWith(2, 'C:\\fake\\.env', 'previous-key');
-    expect(deps.saveConfig).not.toHaveBeenCalled();
-  });
-
-  it('rolls back the env key when the post-switch whoami check fails', async () => {
+  it('rolls back the env key when the post-switch whoami check fails', () => {
     const config = configWith();
     const deps = baseDeps(config, { whoami: vi.fn(() => ({ ok: false, email: null, rawOutput: 'boom' })) });
-    const result = await switchAccount('teammate2', deps);
+    const result = switchAccount('teammate2', deps);
     expect(result.ok).toBe(false);
+    expect(deps.writeEnvKey).toHaveBeenNthCalledWith(1, 'C:\\fake\\.env', 'new-key');
     expect(deps.writeEnvKey).toHaveBeenNthCalledWith(2, 'C:\\fake\\.env', 'previous-key');
     expect(deps.saveConfig).not.toHaveBeenCalled();
   });
