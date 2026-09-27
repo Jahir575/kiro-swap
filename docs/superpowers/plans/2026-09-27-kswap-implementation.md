@@ -6,7 +6,7 @@
 
 **Architecture:** A Node/TypeScript CLI with a JSON store (`~/.kswap/config.json`), a thin `kiro-cli` PATH shim that re-reads the store on every invocation (so a switch takes effect in already-open terminals), and a Crew updater that rewrites `~/.kiro/crew/.env` and restarts the gateway's backend process, rolling back on failure.
 
-**Tech Stack:** TypeScript, Node.js ≥18, `commander` (CLI parsing), `vitest` (tests), compiled with `tsc` to `dist/`, no other runtime dependencies.
+**Tech Stack:** TypeScript, Node.js ≥18, `commander` (CLI parsing), `chalk` (colored output), `cli-table3` (aligned tables), `vitest` (tests), compiled with `tsc` to `dist/`.
 
 **Spec:** `docs/superpowers/specs/2026-09-27-kswap-design.md`
 
@@ -14,6 +14,7 @@
 
 - Package name and CLI command are both `kswap` (not `cswap`).
 - Node ≥18 (per `package.json` `engines`).
+- The project is CommonJS (`"module": "CommonJS"`, `bin/kswap.js` uses `require()`). Use `chalk@^4` specifically, not `^5` — chalk v5 is ESM-only and would break the build; v4 is the last fully CommonJS-compatible major and is what most CJS CLI tools still pin to.
 - Windows-only for v1 — the design's shim, PATH, and ACL mechanisms are all Windows-specific (`.cmd`/`.ps1`, `icacls`, `taskkill`); no cross-platform code paths are in scope.
 - Account keys are stored in plaintext at `~/.kswap/config.json` (per spec — no encryption, no OS credential store in v1).
 - `.env` writes must be UTF-8 **without a BOM** — Node's default `'utf8'` file writes already omit the BOM; the risk is only on read (an existing file may carry one from a prior PowerShell write) and must be stripped before rewriting.
@@ -84,7 +85,9 @@ Expected: FAIL — `src/index.ts` does not exist yet.
   },
   "license": "MIT",
   "dependencies": {
-    "commander": "^12.0.0"
+    "commander": "^12.0.0",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
@@ -1506,12 +1509,18 @@ Expected: FAIL initially on the `writeFileSync`/`saveConfig` calls only if `src/
 `src/cli.ts`:
 ```ts
 import { Command } from 'commander';
+import chalk from 'chalk';
+import Table from 'cli-table3';
 import { addAccount } from './commands/add';
 import { listAccounts } from './commands/list';
 import { currentAccount } from './commands/current';
 import { removeAccount } from './commands/remove';
 import { switchAccount } from './commands/switch';
 import { install } from './installer';
+
+function printError(message: string): void {
+  console.error(chalk.red(message));
+}
 
 export function buildCli(): Command {
   const program = new Command();
@@ -1524,7 +1533,7 @@ export function buildCli(): Command {
     .description('Install the kiro-cli shim and add it to PATH')
     .action(() => {
       install();
-      console.log('kswap installed. Open a new terminal for PATH changes to take effect.');
+      console.log(chalk.green('kswap installed.'), 'Open a new terminal for PATH changes to take effect.');
     });
 
   program
@@ -1534,11 +1543,11 @@ export function buildCli(): Command {
     .action((name: string, key: string, opts: { force?: boolean }) => {
       const result = addAccount(name, key, { force: !!opts.force });
       if (!result.ok) {
-        console.error(result.error);
+        printError(result.error);
         process.exitCode = 1;
         return;
       }
-      console.log(`Added "${name}" (${result.email}).`);
+      console.log(chalk.green('✓'), `Added ${chalk.bold(name)} (${result.email}).`);
     });
 
   program
@@ -1550,9 +1559,11 @@ export function buildCli(): Command {
         console.log('No accounts registered. Use "kswap add <name> <key>".');
         return;
       }
+      const table = new Table({ head: [chalk.bold(''), chalk.bold('Name'), chalk.bold('Email')] });
       for (const a of accounts) {
-        console.log(`${a.active ? '*' : ' '} ${a.name} (${a.email})`);
+        table.push([a.active ? chalk.green('●') : '', a.active ? chalk.bold(a.name) : a.name, a.email]);
       }
+      console.log(table.toString());
     });
 
   program
@@ -1560,7 +1571,11 @@ export function buildCli(): Command {
     .description('Show the currently active account')
     .action(() => {
       const current = currentAccount();
-      console.log(current ? `${current.name} (${current.email})` : 'No account is currently active.');
+      console.log(
+        current
+          ? `${chalk.green('●')} ${chalk.bold(current.name)} (${current.email})`
+          : chalk.dim('No account is currently active.'),
+      );
     });
 
   program
@@ -1569,11 +1584,11 @@ export function buildCli(): Command {
     .action(async (name: string) => {
       const result = await switchAccount(name);
       if (!result.ok) {
-        console.error(result.error);
+        printError(result.error);
         process.exitCode = 1;
         return;
       }
-      console.log(`Switched to "${name}" (${result.email}).`);
+      console.log(chalk.green('✓'), `Switched to ${chalk.bold(name)} (${result.email}).`);
     });
 
   program
@@ -1582,11 +1597,11 @@ export function buildCli(): Command {
     .action((name: string) => {
       const result = removeAccount(name);
       if (!result.ok) {
-        console.error(result.error);
+        printError(result.error);
         process.exitCode = 1;
         return;
       }
-      console.log(`Removed "${name}".`);
+      console.log(chalk.green('✓'), `Removed ${chalk.bold(name)}.`);
     });
 
   return program;
