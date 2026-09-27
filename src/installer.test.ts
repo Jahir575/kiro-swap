@@ -27,13 +27,24 @@ describe('prependUserPath', () => {
 });
 
 describe('install', () => {
-  it('copies the compiled shim runner into the injected kswapHome/dist, never the real ~/.kswap', () => {
+  it('copies the whole compiled dist dir into the injected kswapHome/dist, including sibling imports, never the real ~/.kswap', () => {
     // install() must never write to the real KSWAP_HOME during a test — this test injects
     // its own throwaway home and its own loadConfig/saveConfig so a run on a developer's
     // machine with a real kswap install cannot overwrite that install's shim files or config.
+    //
+    // The fake "built dist" here deliberately has two files, one importing the other, to
+    // catch the real bug found by running the installed shim for real: copying only
+    // shimRunner.js and leaving its sibling store.js behind produces a shim that throws
+    // ERR_MODULE_NOT_FOUND the moment it's actually invoked — something a test that copies
+    // a single isolated file (with nothing to import) can never catch.
     const testHome = mkdtempSync(join(tmpdir(), 'kswap-install-test-'));
-    const fakeBuiltShimRunner = join(mkdtempSync(join(tmpdir(), 'kswap-build-')), 'shimRunner.js');
-    writeFileSync(fakeBuiltShimRunner, '// built shim runner\n', 'utf8');
+    const fakeDistDir = mkdtempSync(join(tmpdir(), 'kswap-build-'));
+    writeFileSync(join(fakeDistDir, 'store.js'), 'export const marker = "sibling-module";\n', 'utf8');
+    writeFileSync(
+      join(fakeDistDir, 'shimRunner.js'),
+      "import { marker } from './store.js';\nexport { marker };\n",
+      'utf8',
+    );
 
     const locateKiroCli = () => 'C:\\fake\\kiro-cli.exe';
     const pathDeps = { getUserPath: () => 'C:\\Windows', setUserPath: () => {} };
@@ -43,7 +54,7 @@ describe('install', () => {
       install({
         locateKiroCli,
         pathDeps,
-        builtShimRunnerPath: fakeBuiltShimRunner,
+        builtDistDir: fakeDistDir,
         loadConfig: () => ({ accounts: {}, active: null, kiroCliPath: null }),
         saveConfig: (c) => {
           captured.config = c;
@@ -52,9 +63,11 @@ describe('install', () => {
       });
 
       expect(existsSync(join(testHome, 'dist', 'shimRunner.js'))).toBe(true);
+      expect(existsSync(join(testHome, 'dist', 'store.js'))).toBe(true);
       expect(captured.config?.kiroCliPath).toBe('C:\\fake\\kiro-cli.exe');
     } finally {
       rmSync(testHome, { recursive: true, force: true });
+      rmSync(fakeDistDir, { recursive: true, force: true });
     }
   });
 });

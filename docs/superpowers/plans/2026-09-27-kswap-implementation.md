@@ -1769,6 +1769,8 @@ export function install(
 
 Note: `__dirname` in the default resolves to `dist/` after `tsc` compiles `src/installer.ts` to `dist/installer.js`, so `join(__dirname, 'shimRunner.js')` correctly points at the sibling compiled `dist/shimRunner.js` when running the real, published CLI — the injected `builtShimRunnerPath` in tests exists purely to avoid depending on a real build during unit tests.
 
+**Further implementation note (found by running `kswap install` for real and then invoking the installed shim directly — not by any unit test):** the single-file `copyFileSync(deps.builtShimRunnerPath, ...)` approach above shipped a shim that threw `ERR_MODULE_NOT_FOUND` the instant it was actually invoked, because the compiled `shimRunner.js` imports its sibling `store.js`, which was never copied alongside it. No unit test caught this, because every test stubs `shimRunner`'s imports rather than running the real compiled file as its own Node process. The fix actually shipped: rename `builtShimRunnerPath` to `builtDistDir` (defaulting to `__dirname`, i.e. the whole compiled `dist/` directory the installer itself lives in) and replace `copyFileSync` with `cpSync(deps.builtDistDir, shimRunnerDir, { recursive: true })`, so every sibling import comes along automatically — robust to future refactors adding more shared modules, not just a fix for this one missing file. The test was rewritten to copy a fake two-file "dist" (one file importing the other) rather than a single isolated file, since only that shape can actually exercise this failure mode.
+
 `README.md`:
 ```markdown
 # kswap
