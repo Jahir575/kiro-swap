@@ -23,14 +23,21 @@ export function locateKiroCli(execFn: ExecFn = defaultExec): string {
   } catch {
     output = '';
   }
-  const firstLine = output
+  // Only ever accept a .exe match. `where kiro-cli` can list kswap's own shim
+  // (kiro-cli.cmd) before the real binary, because install() itself puts the
+  // shim's directory on PATH ahead of the real one — so a naive "take the
+  // first line" can store the shim's own path as "the real kiro-cli", which
+  // it then tries to spawn: itself. The real binary is always a .exe; the
+  // shim never is, so filtering on that is enough to rule this out entirely,
+  // regardless of PATH order.
+  const exeMatch = output
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .find((line) => line.length > 0);
-  if (!firstLine) {
+    .find((line) => line.length > 0 && /\.exe$/i.test(line));
+  if (!exeMatch) {
     throw new Error('kiro-cli not found on PATH');
   }
-  return firstLine;
+  return exeMatch;
 }
 
 export function whoami(

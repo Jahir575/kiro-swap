@@ -29,6 +29,13 @@ export function main(argv: string[]): never {
   }
   const env = resolveEnv(config, process.env);
   const result = spawnSync(realKiroCliPath, args, { env, stdio: 'inherit' });
+  if (result.error) {
+    // Surface spawn failures instead of silently exiting 1 with no output —
+    // this is exactly what made a real self-referential kiroCliPath bug (the
+    // shim spawning itself) so hard to diagnose: it failed with no message.
+    console.error(`kswap: failed to run "${realKiroCliPath}": ${result.error.message}`);
+    process.exit(1);
+  }
   process.exit(result.status ?? 1);
 }
 
