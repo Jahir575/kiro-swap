@@ -74,6 +74,14 @@ Crew for you.
 
 <p align="center"><img src="https://raw.githubusercontent.com/Jahir575/kiro-swap/master/assets/screenshots/switch.svg" alt="kswap switch bob" width="660"></p>
 
+Not sure who to use? Let `kswap` pick the account with the most credit
+left (compared by credits remaining, so plans with different limits are
+handled correctly):
+
+```
+kswap switch --best
+```
+
 ### 4. Check which account is active
 
 ```
@@ -106,6 +114,7 @@ kswap install                # locate kiro-cli, install the PATH shim
 kswap add <name> <api-key>   # register a teammate's Kiro API key once
 kswap list                   # show every registered account + live credit usage
 kswap switch <name>          # make that account active everywhere
+kswap switch --best          # switch to the account with the most credit left
 kswap current                # show which account is active
 kswap remove <name>          # forget an account (must not be active)
 ```

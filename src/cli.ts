@@ -6,6 +6,7 @@ import { listAccounts } from './commands/list.js';
 import { currentAccount } from './commands/current.js';
 import { removeAccount } from './commands/remove.js';
 import { switchAccount } from './commands/switch.js';
+import { findBestAccount } from './commands/best.js';
 import { install } from './installer.js';
 import { VERSION } from './index.js';
 import type { UsageInfo } from './usage.js';
@@ -94,9 +95,27 @@ export function buildCli(): Command {
     });
 
   program
-    .command('switch <name>')
-    .description('Switch kiro-cli to the given account (Kiro Crew needs a manual restart)')
-    .action((name: string) => {
+    .command('switch [name]')
+    .description('Switch kiro-cli to the given account, or --best for the one with the most credit left (Kiro Crew needs a manual restart)')
+    .option('--best', 'switch to the account with the most credit remaining')
+    .action(async (nameArg: string | undefined, opts: { best?: boolean }) => {
+      if (!!nameArg === !!opts.best) {
+        printError('Give either an account name or --best, not both or neither.');
+        process.exitCode = 1;
+        return;
+      }
+      let name = nameArg as string;
+      if (opts.best) {
+        console.error(chalk.dim('Checking credit usage…'));
+        const best = await findBestAccount();
+        if (!best.ok) {
+          printError(best.error);
+          process.exitCode = 1;
+          return;
+        }
+        name = best.name;
+        console.log(chalk.dim(`Most credit remaining: ${best.name} (${best.remaining} credits left)`));
+      }
       const result = switchAccount(name);
       if (!result.ok) {
         printError(result.error);
