@@ -1,6 +1,6 @@
 {
   "name": "kiro-swap",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "type": "module",
   "description": "Switch between multiple Kiro accounts (kiro-cli + Kiro Crew) without repeatedly handling teammates' raw credentials.",
   "bin": {
