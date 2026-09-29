@@ -1,4 +1,5 @@
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadConfig, saveConfig, type Config } from '../store.js';
 import { readEnvKey, writeEnvKey } from '../crew.js';
@@ -13,6 +14,7 @@ export interface SwitchDeps {
   writeEnvKey(path: string, key: string): void;
   whoami(path: string, key: string): { ok: boolean; email: string | null; rawOutput: string };
   envPath: string;
+  crewInstalled?(): boolean;
 }
 
 function defaultCrewDir(): string {
@@ -26,9 +28,11 @@ const realDeps: SwitchDeps = {
   writeEnvKey,
   whoami,
   envPath: join(defaultCrewDir(), '.env'),
+  crewInstalled: () => existsSync(dirname(join(defaultCrewDir(), '.env'))),
 };
 
 const MANUAL_RESTART_NOTE = 'Restart Kiro Crew manually for the gateway to pick up the new account.';
+const NO_CREW_NOTE = 'Kiro Crew is not installed here, so only kiro-cli was switched.';
 
 export function switchAccount(name: string, deps: SwitchDeps = realDeps): SwitchResult {
   const config = deps.loadConfig();
@@ -40,12 +44,15 @@ export function switchAccount(name: string, deps: SwitchDeps = realDeps): Switch
     return { ok: false, error: 'kswap is not installed. Run "kswap install" first.' };
   }
 
-  const previousKey = deps.readEnvKey(deps.envPath);
-  deps.writeEnvKey(deps.envPath, account.key);
+  const crewPresent = deps.crewInstalled ? deps.crewInstalled() : true;
+  const previousKey = crewPresent ? deps.readEnvKey(deps.envPath) : null;
+  if (crewPresent) {
+    deps.writeEnvKey(deps.envPath, account.key);
+  }
 
   const check = deps.whoami(config.kiroCliPath, account.key);
   if (!check.ok || check.email !== account.email) {
-    if (previousKey !== null) {
+    if (crewPresent && previousKey !== null) {
       deps.writeEnvKey(deps.envPath, previousKey);
     }
     return { ok: false, error: `Switch did not take effect: ${check.rawOutput.trim()}. Rolled back.` };
@@ -53,5 +60,5 @@ export function switchAccount(name: string, deps: SwitchDeps = realDeps): Switch
 
   config.active = name;
   deps.saveConfig(config);
-  return { ok: true, email: account.email, note: MANUAL_RESTART_NOTE };
+  return { ok: true, email: account.email, note: crewPresent ? MANUAL_RESTART_NOTE : NO_CREW_NOTE };
 }

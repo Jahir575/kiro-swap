@@ -14,7 +14,7 @@ real, live credit usage so you know at a glance who's about to run out.
 
 ## Requirements
 
-- Windows (v1 is Windows-only — see [Scope](#scope))
+- Windows, macOS, or Linux
 - Node.js 18+
 - [`kiro-cli`](https://kiro.dev) already installed and on `PATH`
 
@@ -25,10 +25,18 @@ npm install -g kiro-swap
 kswap install
 ```
 
-`kswap install` locates your real `kiro-cli.exe`, writes a small shim
-in front of it, and adds that shim's directory to your user `PATH`.
-**Open a new terminal afterwards** — Windows only picks up `PATH`
-changes in new processes.
+`kswap install` locates your real `kiro-cli`, writes a small shim in
+front of it, and puts that shim's directory first on your `PATH`.
+**Open a new terminal afterwards** so the `PATH` change takes effect.
+
+- **Windows:** the shim directory is added to your user `PATH`.
+- **macOS / Linux:** a marked `# >>> kswap >>>` block is added to your
+  shell profile(s) (`~/.zshrc`, `~/.bashrc`, `~/.bash_profile`,
+  `~/.profile` — existing ones, plus your login shell's rc file). It's
+  added only once, so re-running `kswap install` is safe. Using fish or
+  another shell? Add `~/.kswap/bin` to your `PATH` yourself.
+- Kiro Crew is optional. If it isn't installed, `kswap switch` only
+  switches `kiro-cli` and tells you so.
 
 <p align="center"><img src="https://raw.githubusercontent.com/Jahir575/kiro-swap/master/assets/screenshots/install.svg" alt="kswap install" width="560"></p>
 
@@ -121,10 +129,15 @@ kswap remove <name>          # forget an account (must not be active)
 
 ## Scope
 
-v1 covers `kiro-cli` (terminal) and the Kiro Crew gateway, on Windows
-only. It does not cover Kiro IDE (which authenticates via AWS Identity
-Center SSO, not an API key — a different mechanism entirely),
-auto-switching on rate limits, or macOS/Linux.
+Covers `kiro-cli` (terminal) and the Kiro Crew gateway on Windows,
+macOS, and Linux. It does not cover Kiro IDE (which authenticates via
+AWS Identity Center SSO, not an API key — a different mechanism
+entirely) or auto-switching on rate limits.
+
+macOS/Linux support was developed and unit-tested on Windows; the
+generated shell shim was run for real, but a full install on a real
+macOS/Linux machine hasn't been verified yet — please report anything
+that misbehaves.
 
 ## License
 

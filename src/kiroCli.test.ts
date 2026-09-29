@@ -29,6 +29,36 @@ describe('locateKiroCli', () => {
   });
 });
 
+describe('locateKiroCli on macOS/Linux', () => {
+  it('returns the first path from `which -a`', () => {
+    const fakeExec = (cmd: string) => {
+      expect(cmd).toBe('which -a kiro-cli');
+      return '/usr/local/bin/kiro-cli\n';
+    };
+    expect(locateKiroCli(fakeExec, 'linux')).toBe('/usr/local/bin/kiro-cli');
+  });
+
+  it("skips kswap's own shim when PATH resolves it ahead of the real binary", () => {
+    const fakeExec = () => '/home/me/.kswap/bin/kiro-cli\n/home/me/.local/bin/kiro-cli\n';
+    expect(locateKiroCli(fakeExec, 'darwin')).toBe('/home/me/.local/bin/kiro-cli');
+  });
+
+  it('throws when only the kswap shim is found', () => {
+    const fakeExec = () => '/home/me/.kswap/bin/kiro-cli\n';
+    expect(() => locateKiroCli(fakeExec, 'linux')).toThrow('kiro-cli not found on PATH');
+  });
+
+  it('throws when `which` finds nothing or fails', () => {
+    expect(() => locateKiroCli(() => '', 'linux')).toThrow('kiro-cli not found on PATH');
+    expect(
+      () =>
+        locateKiroCli(() => {
+          throw new Error('exit 1');
+        }, 'linux'),
+    ).toThrow('kiro-cli not found on PATH');
+  });
+});
+
 describe('whoami', () => {
   it('reports ok:true and parses the email on a successful login', () => {
     const fakeSpawn = () => ({

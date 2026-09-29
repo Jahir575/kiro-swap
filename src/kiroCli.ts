@@ -16,7 +16,10 @@ type SpawnSyncFn = (
 const defaultExec: ExecFn = (cmd) => execSync(cmd, { encoding: 'utf8' });
 const defaultSpawn: SpawnSyncFn = (path, args, options) => spawnSync(path, args, options) as any;
 
-export function locateKiroCli(execFn: ExecFn = defaultExec): string {
+export function locateKiroCli(execFn: ExecFn = defaultExec, platform: NodeJS.Platform = process.platform): string {
+  if (platform !== 'win32') {
+    return locateKiroCliUnix(execFn);
+  }
   let output = '';
   try {
     output = execFn('where kiro-cli');
@@ -38,6 +41,26 @@ export function locateKiroCli(execFn: ExecFn = defaultExec): string {
     throw new Error('kiro-cli not found on PATH');
   }
   return exeMatch;
+}
+
+function locateKiroCliUnix(execFn: ExecFn): string {
+  let output = '';
+  try {
+    output = execFn('which -a kiro-cli');
+  } catch {
+    output = '';
+  }
+  // Same self-reference hazard as on Windows: kswap's shim (~/.kswap/bin/kiro-cli) sits
+  // ahead of the real binary on PATH by design, so `which -a` can list it first. The
+  // real binary has no extension to filter on here, so exclude by shim directory.
+  const realMatch = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !/[\\/]\.kswap[\\/]bin[\\/]/.test(line));
+  if (!realMatch) {
+    throw new Error('kiro-cli not found on PATH');
+  }
+  return realMatch;
 }
 
 export function whoami(

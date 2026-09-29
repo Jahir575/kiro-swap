@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -51,16 +51,24 @@ export function loadConfig(homeDir: string = homedir()): Config {
 
 export function saveConfig(config: Config, homeDir: string = homedir()): void {
   const dir = configDir(homeDir);
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const file = configFilePath(homeDir);
   const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(config, null, 2), 'utf8');
+  writeFileSync(tmp, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
   renameSync(tmp, file);
   restrictToOwner(dir);
 }
 
-function restrictToOwner(dir: string): void {
-  if (process.platform !== 'win32') {
+function restrictToOwner(dir: string, platform: NodeJS.Platform = process.platform): void {
+  if (platform !== 'win32') {
+    // API keys live in this file: owner-only, and re-applied on every save so a
+    // directory created earlier with looser permissions gets tightened too.
+    try {
+      chmodSync(dir, 0o700);
+      chmodSync(join(dir, 'config.json'), 0o600);
+    } catch {
+      // Best-effort, same as the Windows ACL path below.
+    }
     return;
   }
   try {

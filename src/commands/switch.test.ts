@@ -37,6 +37,20 @@ describe('switchAccount', () => {
     expect(deps.saveConfig).toHaveBeenCalledWith(expect.objectContaining({ active: 'teammate2' }));
   });
 
+  it('skips the Crew .env entirely and says so when Kiro Crew is not installed', () => {
+    const config = configWith();
+    const deps = baseDeps(config, { crewInstalled: () => false });
+    const result = switchAccount('teammate2', deps);
+    expect(result).toEqual({
+      ok: true,
+      email: 'teammate2@company.com',
+      note: 'Kiro Crew is not installed here, so only kiro-cli was switched.',
+    });
+    expect(deps.readEnvKey).not.toHaveBeenCalled();
+    expect(deps.writeEnvKey).not.toHaveBeenCalled();
+    expect(deps.saveConfig).toHaveBeenCalledWith(expect.objectContaining({ active: 'teammate2' }));
+  });
+
   it('returns an error for an unknown account without touching env', () => {
     const config = configWith();
     const deps = baseDeps(config);
