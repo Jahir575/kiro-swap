@@ -13,6 +13,18 @@ export function resolveEnv(config: Config | null, baseEnv: NodeJS.ProcessEnv): N
   return { ...baseEnv, KIRO_API_KEY: account.key };
 }
 
+export function spawnErrorMessage(realKiroCliPath: string, error: Error & { code?: string }): string {
+  if (error.code === 'ENOENT') {
+    // Typically kiro-cli was uninstalled, or an update moved it. The recorded path
+    // is stale, so point at the fix rather than leaving a bare spawnSync error.
+    return (
+      `kswap: the recorded kiro-cli binary no longer exists: "${realKiroCliPath}".\n` +
+      'Reinstall kiro-cli if needed, then run "kswap install" to record its new location.'
+    );
+  }
+  return `kswap: failed to run "${realKiroCliPath}": ${error.message}`;
+}
+
 export function main(argv: string[]): never {
   const args = argv.slice(2);
   let config: Config | null;
@@ -33,7 +45,7 @@ export function main(argv: string[]): never {
     // Surface spawn failures instead of silently exiting 1 with no output —
     // this is exactly what made a real self-referential kiroCliPath bug (the
     // shim spawning itself) so hard to diagnose: it failed with no message.
-    console.error(`kswap: failed to run "${realKiroCliPath}": ${result.error.message}`);
+    console.error(spawnErrorMessage(realKiroCliPath, result.error));
     process.exit(1);
   }
   process.exit(result.status ?? 1);
