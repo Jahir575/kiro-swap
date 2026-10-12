@@ -115,6 +115,10 @@ export function install(
   // installed shim directly, not by the unit tests, which stub the import and never
   // execute the real compiled file as a standalone process).
   cpSync(deps.builtDistDir, shimRunnerDir, { recursive: true });
+  // The compiled files are ESM, but once copied out of the package there is no
+  // package.json above them saying so, and Node then warns
+  // (MODULE_TYPELESS_PACKAGE_JSON) on every kiro-cli invocation.
+  writeFileSync(join(shimRunnerDir, 'package.json'), '{ "type": "module" }\n', 'utf8');
   const shimRunnerJsPath = join(shimRunnerDir, 'shimRunner.js');
 
   if (platform === 'win32') {

@@ -152,6 +152,10 @@ describe('install', () => {
 
       expect(existsSync(join(testHome, 'dist', 'shimRunner.js'))).toBe(true);
       expect(existsSync(join(testHome, 'dist', 'store.js'))).toBe(true);
+      // The copied dist/ has no package.json above it declaring ESM, so without this marker
+      // Node prints MODULE_TYPELESS_PACKAGE_JSON on every single kiro-cli invocation.
+      const pkg = JSON.parse(readFileSync(join(testHome, 'dist', 'package.json'), 'utf8'));
+      expect(pkg.type).toBe('module');
       expect(captured.config?.kiroCliPath).toBe('C:\\fake\\kiro-cli.exe');
     } finally {
       rmSync(testHome, { recursive: true, force: true });

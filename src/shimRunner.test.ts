@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveEnv } from './shimRunner.js';
+import { resolveEnv, spawnErrorMessage } from './shimRunner.js';
 import type { Config } from './store.js';
 
 describe('resolveEnv', () => {
@@ -29,5 +29,20 @@ describe('resolveEnv', () => {
     const config: Config = { accounts: {}, active: null, kiroCliPath: null };
     const baseEnv = { PATH: 'C:\\Windows' } as any;
     expect(resolveEnv(config, baseEnv)).toBe(baseEnv);
+  });
+});
+
+describe('spawnErrorMessage', () => {
+  it('explains a missing kiro-cli binary and how to recover', () => {
+    const error = Object.assign(new Error('spawnSync C:\\gone\\kiro-cli.exe ENOENT'), { code: 'ENOENT' });
+    const message = spawnErrorMessage('C:\\gone\\kiro-cli.exe', error);
+    expect(message).toContain('C:\\gone\\kiro-cli.exe');
+    expect(message).toContain('no longer exists');
+    expect(message).toContain('kswap install');
+  });
+
+  it('reports other spawn failures verbatim', () => {
+    const error = Object.assign(new Error('spawnSync x EACCES'), { code: 'EACCES' });
+    expect(spawnErrorMessage('x', error)).toBe('kswap: failed to run "x": spawnSync x EACCES');
   });
 });
